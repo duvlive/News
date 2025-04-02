@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DUV LIVE ENTERTAINMENT NEWS</title>
+  <style>
+    @font-face {
+      font-family: 'Accordion Black';
+      src: url('https://fonts.cdnfonts.com/s/21899/accordion-black.woff') format('woff');
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .section {
+      margin: 20px;
+      width: 80%;
+      max-width: 800px;
+    }
+
+    .upload-section, .text-section {
+      margin: 20px;
+    }
+
+    .scroll-container {
+      width: 100%;
+      max-width: 500px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      height: 500px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    canvas {
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>DUV LIVE ENTERTAINMENT NEWS</h1>
+
+  <!-- Image Upload and Text Overlay Section -->
+  <div class="section" id="text-overlay-section">
+    <h2>Text Overlay on Images</h2>
+    <div class="upload-section">
+      <label for="image-upload">Upload an image:</label>
+      <input type="file" id="image-upload" accept="image/*">
+    </div>
+
+    <div class="text-section">
+      <label for="text-lines">Enter text (one line per image):</label>
+      <textarea id="text-lines" rows="5" cols="30" placeholder="Line 1\nLine 2\nLine 3"></textarea>
+      <button id="generate">Generate</button>
+      <button id="save-all-images">Save All Images</button>
+    </div>
+
+    <div class="scroll-container" id="scroll-container">
+      <!-- Generated canvases will appear here -->
+    </div>
+  </div>
+
+  <!-- Image Upload and Video Generation Section -->
+  <div class="section" id="video-generation-section">
+    <h2>Generate Video from Images</h2>
+    <div class="upload-section">
+      <label for="fileInput">Upload images:</label>
+      <input type="file" id="fileInput" accept="image/*" multiple>
+    </div>
+    <button id="generate-video">Generate Video</button>
+  </div>
+
+  <script>
+    // Image Overlay with Text Section (Text Overlay App)
+    const imageUpload = document.getElementById('image-upload');
+    const textLines = document.getElementById('text-lines');
+    const generateButton = document.getElementById('generate');
+    const saveAllImagesButton = document.getElementById('save-all-images');
+    const scrollContainer = document.getElementById('scroll-container');
+    let uploadedImage = new Image();
+    let frames = [];
+    let imageLoaded = false;
+
+    imageUpload.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = () => {
+          uploadedImage.src = reader.result;
+        };
+        reader.readAsDataURL(file);
+      }
+    });
+
+    uploadedImage.onload = () => {
+      imageLoaded = true;
+    };
+
+    generateButton.addEventListener('click', () => {
+      if (!imageLoaded) {
+        alert('Please upload an image first!');
+        return;
+      }
+
+      const lines = textLines.value.split('\n');
+      if (lines.length === 0) {
+        alert('Please enter some text lines!');
+        return;
+      }
+
+      scrollContainer.innerHTML = '';
+      frames = [];
+
+      uploadedImage.onload = () => {
+        const baseLine = lines.join(' ');
+        const containerWidth = scrollContainer.clientWidth;
+        const containerHeight = scrollContainer.clientHeight;
+
+        for (let i = 0; i <= baseLine.length; i++) {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const scale = Math.min(containerWidth / uploadedImage.width, containerHeight / uploadedImage.height);
+          const newWidth = uploadedImage.width * scale;
+          const newHeight = uploadedImage.height * scale;
+
+          canvas.width = newWidth;
+          canvas.height = newHeight;
+
+          ctx.drawImage(uploadedImage, 0, 0, newWidth, newHeight);
+
+          const boxHeight = 15;
+          const boxPadding = 10;
+          const boxWidth = newWidth * 1.25;
+          const boxY = newHeight - boxHeight - 40;
+
+          ctx.fillStyle = '#fff';
+          ctx.strokeStyle = '#ccc';
+          ctx.lineWidth = 2;
+
+          ctx.fillRect(0, boxY, boxWidth, boxHeight);
+          ctx.strokeRect(0, boxY, boxWidth, boxHeight);
+
+          const visibleText = baseLine.slice(0, i);
+          ctx.font = 'bold 16px "Accordion Black", sans-serif';
+          ctx.fillStyle = 'black';
+          ctx.textAlign = 'right';
+          ctx.textBaseline = 'middle';
+          ctx.fillText(visibleText, boxWidth - boxPadding, boxY + boxHeight / 2);
+
+          scrollContainer.appendChild(canvas);
+          frames.push(canvas);
+        }
+      };
+
+      if (uploadedImage.complete) {
+        uploadedImage.onload();
+      }
+    });
+
+    saveAllImagesButton.addEventListener('click', () => {
+      if (frames.length === 0) {
+        alert('Please generate the images first!');
+        return;
+      }
+
+      frames.forEach((canvas, index) => {
+        setTimeout(() => {
+          canvas.toBlob(function(blob) {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = `image${index + 1}.png`;
+            link.click();
+          }, 'image/png');
+        }, index * 1000);
+      });
+    });
+
+    // Video Generation Section (Video Creation App)
+    const videoElement = document.createElement('video');
+    const canvasVideo = document.createElement('canvas');
+    const ctxVideo = canvasVideo.getContext('2d');
+    let images = [];
+
+    const fileInput = document.getElementById('fileInput');
+    const generateVideoButton = document.getElementById('generate-video');
+
+    fileInput.addEventListener('change', handleFileUpload);
+
+    function handleFileUpload(event) {
+      const files = event.target.files;
+      images = [];
+      for (let i = 0; i < files.length; i++) {
+        const url = URL.createObjectURL(files[i]);
+        images.push(url);
+      }
+    }
+
+    generateVideoButton.addEventListener('click', generateVideo);
+
+    async function generateVideo() {
+      if (images.length === 0) return;
+
+      const fps = 33.33;
+      const stream = canvasVideo.captureStream(fps);
+      const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' });
+      let chunks = [];
+
+      recorder.ondataavailable = (event) => chunks.push(event.data);
+      recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        const videoUrl = URL.createObjectURL(blob);
+        downloadVideo(videoUrl);
+      };
+
+      recorder.start();
+
+      const reversedImages = images.slice().reverse();
+
+      for (const imgSrc of reversedImages) {
+        await drawFrame(imgSrc);
+      }
+
+      recorder.stop();
+    }
+
+    function drawFrame(imgSrc) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.src = imgSrc;
+        img.onload = () => {
+          canvasVideo.width = img.width;
+          canvasVideo.height = img.height;
+          ctxVideo.drawImage(img, 0, 0);
+          setTimeout(resolve, 30);
+        };
+      });
+    }
+
+    function downloadVideo(videoUrl) {
+      const a = document.createElement('a');
+      a.href = videoUrl;
+      a.download = 'output.webm';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+  </script>
+</body>
+</html>
